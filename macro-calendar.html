@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Macro Ledger</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=IBM+Plex+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg: #14171a;
+    --bg-raised: #1c2024;
+    --bg-card: #202428;
+    --line: #2c3238;
+    --ink: #eef0f2;
+    --ink-dim: #8a9199;
+    --ink-faint: #565d64;
+    --brass: #c9a24b;
+    --brass-dim: #7a6535;
+    --ok: #6fae7a;
+    --steel: #4d6b82;
+    --train: #7a6535;
+    --rest: #3f5566;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:radial-gradient(1200px 600px at 50% -10%, #1d2226 0%, var(--bg) 60%);
+    color:var(--ink);
+    font-family:'Inter',sans-serif;
+    min-height:100vh;
+    padding-bottom:60px;
+  }
+  .wrap{max-width:640px;margin:0 auto;padding:26px 16px 0;}
+
+  header.top{
+    display:flex;align-items:baseline;justify-content:space-between;
+    margin-bottom:18px;padding-bottom:14px;border-bottom:1px solid var(--line);
+  }
+  .brand-eyebrow{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.14em;color:var(--brass);text-transform:uppercase;}
+  h1{font-family:'Bebas Neue',sans-serif;font-size:32px;letter-spacing:.03em;margin:2px 0 0;color:var(--ink);}
+  .status-tag{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--ink-faint);text-align:right;}
+
+  /* Calendar */
+  .cal-nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
+  .cal-nav button{
+    background:var(--bg-card);border:1px solid var(--line);color:var(--ink-dim);
+    width:32px;height:32px;border-radius:8px;font-size:16px;cursor:pointer;
+  }
+  .cal-nav button:hover{color:var(--brass);border-color:var(--brass-dim);}
+  .cal-month{font-family:'IBM Plex Mono',monospace;font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink);}
+
+  .cal-grid{
+    display:grid;grid-template-columns:repeat(7,1fr);gap:5px;margin-bottom:22px;
+  }
+  .cal-dow{
+    font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--ink-faint);
+    text-align:center;padding-bottom:4px;letter-spacing:.06em;
+  }
+  .cal-cell{
+    aspect-ratio:1;border-radius:8px;background:var(--bg-card);border:1px solid var(--line);
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
+    cursor:pointer;position:relative;transition:border-color .15s ease, background .15s ease;
+  }
+  .cal-cell.empty{background:transparent;border:none;cursor:default;}
+  .cal-cell:not(.empty):hover{border-color:var(--brass-dim);}
+  .cal-cell.selected{border-color:var(--brass);background:#26241a;}
+  .cal-cell.today .daynum{color:var(--brass);}
+  .daynum{font-family:'IBM Plex Mono',monospace;font-size:13px;color:var(--ink-dim);}
+  .cal-dot{width:16px;height:3px;border-radius:2px;background:var(--line);}
+  .cal-dot.has-data{background:var(--steel);}
+  .cal-typebadge{
+    position:absolute;top:3px;right:3px;width:6px;height:6px;border-radius:50%;
+  }
+  .cal-typebadge.rest{background:var(--rest);}
+  .cal-typebadge.train{background:var(--brass-dim);}
+
+  /* Day type toggle */
+  .daytype-toggle{
+    display:flex;gap:2px;background:var(--bg-raised);border:1px solid var(--line);
+    border-radius:8px;padding:3px;margin-bottom:20px;
+  }
+  .daytype-toggle button{
+    flex:1;padding:11px 10px;background:transparent;border:none;border-radius:6px;
+    color:var(--ink-dim);font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:600;
+    letter-spacing:.05em;text-transform:uppercase;cursor:pointer;transition:background .15s ease, color .15s ease;
+  }
+  .daytype-toggle button.active{background:var(--bg-card);color:var(--brass);box-shadow:inset 0 0 0 1px var(--line);}
+
+  .selected-date-label{
+    font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--ink-faint);
+    margin-bottom:10px;letter-spacing:.05em;text-transform:uppercase;
+  }
+
+  .ledger{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:26px;}
+  .gauge{background:var(--bg-card);border:1px solid var(--line);border-radius:10px;padding:14px 14px 12px;}
+  .gauge-top{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:9px;}
+  .gauge-label{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-dim);}
+  .gauge-nums{font-family:'IBM Plex Mono',monospace;font-size:13px;color:var(--ink);}
+  .gauge-nums span{color:var(--ink-faint);}
+  .scale-track{
+    position:relative;height:10px;border-radius:3px;
+    background:repeating-linear-gradient(90deg, var(--line) 0 1px, transparent 1px 10%);
+    background-color:#171a1d;overflow:hidden;border:1px solid var(--line);
+  }
+  .scale-fill{height:100%;border-radius:2px;transition:width .35s cubic-bezier(.4,0,.2,1);background:linear-gradient(90deg, var(--brass-dim), var(--brass));}
+  .scale-fill.over{background:linear-gradient(90deg, #8a5a3a, #c97b4b);}
+  .cal-gauge .scale-fill{background:linear-gradient(90deg, #3f5b46, var(--ok));}
+
+  .meal{margin-bottom:18px;}
+  .meal-head{display:flex;align-items:center;gap:10px;margin-bottom:8px;}
+  .meal-head .num{font-family:'Bebas Neue',sans-serif;font-size:20px;color:var(--brass-dim);min-width:22px;}
+  .meal-head h2{font-family:'Bebas Neue',sans-serif;font-size:20px;font-weight:400;letter-spacing:.04em;margin:0;color:var(--ink);}
+
+  .item{
+    display:flex;align-items:center;gap:12px;background:var(--bg-card);border:1px solid var(--line);
+    border-radius:8px;padding:11px 13px;margin-bottom:7px;cursor:pointer;
+    transition:background .15s ease, border-color .15s ease; -webkit-tap-highlight-color:transparent;
+  }
+  .item:active{background:#242931;}
+  .item.checked{border-color:var(--brass-dim);background:#22261f;}
+  .checkbox{
+    width:20px;height:20px;flex:0 0 20px;border-radius:5px;border:1.5px solid var(--ink-faint);
+    display:flex;align-items:center;justify-content:center;transition:border-color .15s ease, background .15s ease;
+  }
+  .item.checked .checkbox{background:var(--brass);border-color:var(--brass);}
+  .checkbox svg{width:12px;height:12px;opacity:0;transform:scale(.6);transition:opacity .12s ease, transform .12s ease;}
+  .item.checked .checkbox svg{opacity:1;transform:scale(1);}
+  .item-label{flex:1;font-size:14.5px;font-weight:500;color:var(--ink);transition:color .15s ease;}
+  .item.checked .item-label{color:var(--ink-dim);text-decoration:line-through;text-decoration-color:var(--ink-faint);}
+  .item-macros{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--ink-faint);white-space:nowrap;text-align:right;line-height:1.4;}
+
+  .flex-note{font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:var(--ink-faint);padding:8px 2px 20px;line-height:1.5;}
+
+  .legend{display:flex;gap:16px;justify-content:center;margin-bottom:20px;font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:var(--ink-faint);}
+  .legend span{display:inline-flex;align-items:center;gap:5px;}
+  .legend .dot{width:7px;height:7px;border-radius:50%;}
+  .legend .dot.rest{background:var(--rest);}
+  .legend .dot.train{background:var(--brass-dim);}
+
+  .loading{text-align:center;padding:40px;color:var(--ink-faint);font-family:'IBM Plex Mono',monospace;font-size:12px;}
+
+  .steps-card{
+    background:var(--bg-card);border:1px solid var(--line);border-radius:10px;
+    padding:14px 14px 14px;margin-bottom:22px;
+  }
+  .steps-top{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:9px;}
+  .steps-label{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-dim);}
+  .steps-goal{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--ink-faint);}
+  .steps-row{display:flex;align-items:center;gap:10px;}
+  .steps-input{
+    flex:1;background:#171a1d;border:1px solid var(--line);border-radius:6px;
+    color:var(--ink);font-family:'IBM Plex Mono',monospace;font-size:16px;
+    padding:9px 12px;outline:none;transition:border-color .15s ease;
+  }
+  .steps-input:focus{border-color:var(--brass-dim);}
+  .steps-save{
+    background:var(--brass-dim);border:none;color:var(--bg);font-family:'IBM Plex Mono',monospace;
+    font-size:11.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;
+    padding:0 16px;height:38px;border-radius:6px;cursor:pointer;transition:background .15s ease;
+  }
+  .steps-save:hover{background:var(--brass);}
+  .steps-save:disabled{opacity:.4;cursor:default;}
+  .steps-track-wrap{margin-top:10px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="top">
+    <div>
+      <div class="brand-eyebrow">Cutting Phase / PPL</div>
+      <h1>Macro Ledger</h1>
+    </div>
+    <div class="status-tag" id="statusTag">syncing&hellip;</div>
+  </header>
+
+  <div class="cal-nav">
+    <button id="prevMonth">&#8249;</button>
+    <div class="cal-month" id="calMonthLabel"></div>
+    <button id="nextMonth">&#8250;</button>
+  </div>
+
+  <div class="cal-grid" id="calGrid"></div>
+
+  <div class="legend">
+    <span><span class="dot rest"></span>Rest day logged</span>
+    <span><span class="dot train"></span>Train day logged</span>
+  </div>
+
+  <div class="selected-date-label" id="selectedDateLabel"></div>
+
+  <div class="daytype-toggle">
+    <button id="btnRest">Rest Day</button>
+    <button id="btnTrain">Train Day</button>
+  </div>
+
+  <div id="panelContent">
+    <div class="loading">loading day&hellip;</div>
+  </div>
+
+</div>
+
+<script>
+const CHECK_SVG = `<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M20 6L9 17l-5-5" stroke="#14171a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+
+const templates = {
+  rest: {
+    targets: { cal: 2150, p: 180, c: 200, f: 70 },
+    meals: [
+      { name: "Breakfast", items: [
+        { label: "Premier Protein Shake", cal:160, p:30, c:4, f:3 },
+        { label: "Oikos Triple Zero", cal:90, p:15, c:7, f:0 },
+        { label: "2x English Muffin", cal:300, p:10, c:56, f:2 },
+        { label: "2x Eggs", cal:140, p:12, c:1, f:10 },
+        { label: "Winky Protein Pudding", cal:90, p:10, c:17, f:2 },
+      ]},
+      { name: "Lunch", items: [
+        { label: "9oz NY Strip Steak", cal:585, p:51.75, c:0, f:40.5 },
+        { label: "Sweet Potato Fries (85g)", cal:135, p:1, c:16, f:5 },
+        { label: "1 cup Milk", cal:120, p:13, c:6, f:4.5 },
+        { label: "1 scoop ON Whey", cal:120, p:24, c:4, f:1 },
+      ]},
+      { name: "Evening", items: [
+        { label: "Swiig Rolled Oats (4 scoops)", cal:440, p:16, c:76, f:8 },
+        { label: "Quaker Oats (1.5 cups / 120g)", cal:450, p:15, c:81, f:9 },
+        { label: "Fresh OJ (~1 cup, est.)", cal:110, p:2, c:26, f:0.5 },
+      ]}
+    ],
+    note: "OJ is a USDA estimate \u2014 send its actual label to lock in exact numbers. Only check ONE oats option per day, not both."
+  },
+  train: {
+    targets: { cal: 2500, p: 180, c: 288, f: 70 },
+    meals: [
+      { name: "Breakfast", items: [
+        { label: "Premier Protein Shake", cal:160, p:30, c:4, f:3 },
+        { label: "Oikos Triple Zero", cal:90, p:15, c:7, f:0 },
+        { label: "2x English Muffin", cal:300, p:10, c:56, f:2 },
+        { label: "2x Eggs", cal:140, p:12, c:1, f:10 },
+        { label: "Winky Protein Pudding", cal:90, p:10, c:17, f:2 },
+      ]},
+      { name: "Lunch", items: [
+        { label: "Breaded Chicken Breast (126g)", cal:240, p:24, c:13.5, f:9 },
+        { label: "9oz NY Strip Steak (alt.)", cal:585, p:51.75, c:0, f:40.5 },
+        { label: "Sweet Potato Fries (85g)", cal:135, p:1, c:16, f:5 },
+        { label: "1 cup Milk", cal:120, p:13, c:6, f:4.5 },
+        { label: "1 scoop ON Whey", cal:120, p:24, c:4, f:1 },
+      ]},
+      { name: "Pre-Workout", items: [
+        { label: "Drizzilicious (1 bag)", cal:90, p:1, c:15, f:3 },
+      ]},
+      { name: "Post-Workout", items: [
+        { label: "1 scoop ON Whey", cal:120, p:24, c:4, f:1 },
+        { label: "1 cup Milk", cal:120, p:13, c:6, f:4.5 },
+      ]},
+      { name: "Evening", items: [
+        { label: "Swiig Rolled Oats (4 scoops)", cal:440, p:16, c:76, f:8 },
+        { label: "Quaker Oats (1.5 cups / 120g)", cal:450, p:15, c:81, f:9 },
+        { label: "Fresh OJ (~1 cup, est.)", cal:110, p:2, c:26, f:0.5 },
+        { label: "1x English Muffin", cal:150, p:5, c:28, f:1 },
+        { label: "Sweet Potato Fries (85g)", cal:135, p:1, c:16, f:5 },
+      ]}
+    ],
+    note: "OJ is a USDA estimate \u2014 send its actual label to lock in exact numbers. Only check ONE oats option and ONE lunch protein per day, not both."
+  }
+};
+
+function fmt(n){ return (Math.round(n * 10) / 10).toString(); }
+function pad2(n){ return n < 10 ? "0"+n : ""+n; }
+function dateKey(d){ return d.getFullYear() + "-" + pad2(d.getMonth()+1) + "-" + pad2(d.getDate()); }
+
+const today = new Date();
+let viewYear = today.getFullYear();
+let viewMonth = today.getMonth(); // 0-indexed
+let selectedDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+
+// cache of loaded day records: { "YYYY-MM-DD": { dayType: 'rest'|'train', checked: {...} } }
+const dayCache = {};
+// cache of month summaries for dot indicators: { "YYYY-MM-DD": {dayType, pctCal} }
+const monthSummaryCache = {};
+
+async function loadDay(key){
+  if(dayCache[key]) return dayCache[key];
+  try{
+    const res = await window.storage.get("day:" + key, false);
+    if(res && res.value){
+      const parsed = JSON.parse(res.value);
+      dayCache[key] = parsed;
+      return parsed;
+    }
+  }catch(e){
+    // key not found or error - treat as empty
+  }
+  const empty = { dayType: null, checked: {}, steps: null };
+  dayCache[key] = empty;
+  return empty;
+}
+
+async function saveDay(key, record){
+  dayCache[key] = record;
+  try{
+    await window.storage.set("day:" + key, JSON.stringify(record), false);
+    setStatus("saved");
+  }catch(e){
+    setStatus("save failed");
+  }
+}
+
+function setStatus(msg){
+  document.getElementById("statusTag").textContent = msg;
+}
+
+function initChecked(dayType){
+  const tpl = templates[dayType];
+  const state = {};
+  tpl.meals.forEach((meal, mi) => {
+    meal.items.forEach((item, ii) => { state[mi+"-"+ii] = false; });
+  });
+  return state;
+}
+
+function computeTotals(dayType, checked){
+  const tpl = templates[dayType];
+  const totals = { cal:0, p:0, c:0, f:0 };
+  tpl.meals.forEach((meal, mi) => {
+    meal.items.forEach((item, ii) => {
+      if(checked[mi+"-"+ii]){
+        totals.cal += item.cal; totals.p += item.p; totals.c += item.c; totals.f += item.f;
+      }
+    });
+  });
+  return totals;
+}
+
+async function renderCalendar(){
+  const grid = document.getElementById("calGrid");
+  const monthLabel = document.getElementById("calMonthLabel");
+  const monthNames = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+  monthLabel.textContent = monthNames[viewMonth] + " " + viewYear;
+
+  const firstDay = new Date(viewYear, viewMonth, 1);
+  const startOffset = firstDay.getDay();
+  const daysInMonth = new Date(viewYear, viewMonth+1, 0).getDate();
+
+  let html = "";
+  ["S","M","T","W","T","F","S"].forEach(d => html += `<div class="cal-dow">${d}</div>`);
+  for(let i=0;i<startOffset;i++) html += `<div class="cal-cell empty"></div>`;
+
+  for(let day=1; day<=daysInMonth; day++){
+    const d = new Date(viewYear, viewMonth, day);
+    const key = dateKey(d);
+    const isToday = dateKey(today) === key;
+    const isSelected = dateKey(selectedDate) === key;
+    html += `<div class="cal-cell ${isToday?'today':''} ${isSelected?'selected':''}" data-key="${key}">
+      <div class="daynum">${day}</div>
+      <div class="cal-dot" data-dot="${key}"></div>
+    </div>`;
+  }
+  grid.innerHTML = html;
+
+  grid.querySelectorAll(".cal-cell:not(.empty)").forEach(cell => {
+    cell.addEventListener("click", async () => {
+      const key = cell.getAttribute("data-key");
+      const [y,m,dd] = key.split("-").map(Number);
+      selectedDate = new Date(y, m-1, dd);
+      await renderCalendar();
+      await renderPanel();
+    });
+  });
+
+  // load dots (fire and forget, update as they resolve)
+  for(let day=1; day<=daysInMonth; day++){
+    const d = new Date(viewYear, viewMonth, day);
+    const key = dateKey(d);
+    loadDay(key).then(rec => {
+      const dotEl = grid.querySelector(`[data-dot="${key}"]`);
+      if(!dotEl) return;
+      if(rec.dayType){
+        dotEl.classList.add("has-data");
+        dotEl.style.background = rec.dayType === "rest" ? "var(--rest)" : "var(--brass-dim)";
+      }
+    }).catch(()=>{});
+  }
+}
+
+async function renderPanel(){
+  const key = dateKey(selectedDate);
+  const label = document.getElementById("selectedDateLabel");
+  const opts = { weekday:'long', month:'long', day:'numeric' };
+  label.textContent = selectedDate.toLocaleDateString(undefined, opts) + (dateKey(today)===key ? " \u2014 Today" : "");
+
+  document.getElementById("panelContent").innerHTML = `<div class="loading">loading day&hellip;</div>`;
+  setStatus("loading\u2026");
+
+  const rec = await loadDay(key);
+  let dayType = rec.dayType;
+  let checked = rec.checked || {};
+  let steps = (rec.steps === undefined) ? null : rec.steps;
+
+  if(!dayType){
+    // no data yet for this date - default to train, don't save until user interacts
+    dayType = "train";
+    checked = initChecked(dayType);
+  }
+
+  document.getElementById("btnRest").classList.toggle("active", dayType === "rest");
+  document.getElementById("btnTrain").classList.toggle("active", dayType === "train");
+
+  renderPanelBody(key, dayType, checked, steps);
+  setStatus("synced");
+}
+
+function renderPanelBody(key, dayType, checked, steps){
+  const tpl = templates[dayType];
+  const totals = computeTotals(dayType, checked);
+  const STEP_GOAL = 10000;
+  const stepsHave = (steps === null || steps === undefined) ? 0 : steps;
+  const stepsPct = Math.min(100, (stepsHave / STEP_GOAL) * 100);
+  const stepsOver = stepsHave > STEP_GOAL;
+
+  const rows = [
+    { label:"Calories", cls:"cal-gauge", have: totals.cal, target: tpl.targets.cal, unit:"" },
+    { label:"Protein", cls:"", have: totals.p, target: tpl.targets.p, unit:"g" },
+    { label:"Carbs", cls:"", have: totals.c, target: tpl.targets.c, unit:"g" },
+    { label:"Fat", cls:"", have: totals.f, target: tpl.targets.f, unit:"g" },
+  ];
+  const ledgerHtml = rows.map(r => {
+    const pct = Math.min(100, (r.have / r.target) * 100);
+    const over = r.have > r.target;
+    return `<div class="gauge ${r.cls}">
+      <div class="gauge-top">
+        <span class="gauge-label">${r.label}</span>
+        <span class="gauge-nums">${fmt(r.have)}${r.unit} <span>/ ${r.target}${r.unit}</span></span>
+      </div>
+      <div class="scale-track"><div class="scale-fill ${over?'over':''}" style="width:${pct}%"></div></div>
+    </div>`;
+  }).join("");
+
+  const mealsHtml = tpl.meals.map((meal, mi) => {
+    const itemsHtml = meal.items.map((item, ii) => {
+      const ikey = mi+"-"+ii;
+      const isChecked = !!checked[ikey];
+      return `<div class="item ${isChecked?'checked':''}" data-ikey="${ikey}">
+        <div class="checkbox">${CHECK_SVG}</div>
+        <div class="item-label">${item.label}</div>
+        <div class="item-macros">${item.cal} cal<br>${fmt(item.p)}p ${fmt(item.c)}c ${fmt(item.f)}f</div>
+      </div>`;
+    }).join("");
+    return `<div class="meal">
+      <div class="meal-head"><span class="num">0${mi+1}</span><h2>${meal.name}</h2></div>
+      ${itemsHtml}
+    </div>`;
+  }).join("");
+
+  const stepsCardHtml = `
+    <div class="steps-card">
+      <div class="steps-top">
+        <span class="steps-label">Steps (EOD)</span>
+        <span class="steps-goal">goal ${STEP_GOAL.toLocaleString()}</span>
+      </div>
+      <div class="steps-row">
+        <input class="steps-input" id="stepsInput" type="number" inputmode="numeric" min="0" step="1"
+          placeholder="e.g. 10500" value="${steps === null || steps === undefined ? '' : steps}">
+        <button class="steps-save" id="stepsSaveBtn">Save</button>
+      </div>
+      <div class="steps-track-wrap">
+        <div class="scale-track"><div class="scale-fill ${stepsOver ? 'over' : ''}" style="width:${stepsPct}%"></div></div>
+      </div>
+    </div>
+  `;
+
+  document.getElementById("panelContent").innerHTML = `
+    ${stepsCardHtml}
+    <div class="ledger">${ledgerHtml}</div>
+    ${mealsHtml}
+    <div class="flex-note">${tpl.note}</div>
+  `;
+
+  document.getElementById("panelContent").querySelectorAll(".item").forEach(el => {
+    el.addEventListener("click", async () => {
+      const ikey = el.getAttribute("data-ikey");
+      checked[ikey] = !checked[ikey];
+      renderPanelBody(key, dayType, checked, steps);
+      await saveDay(key, { dayType, checked, steps });
+      await renderCalendar();
+    });
+  });
+
+  const stepsSaveBtn = document.getElementById("stepsSaveBtn");
+  const stepsInput = document.getElementById("stepsInput");
+  stepsSaveBtn.addEventListener("click", async () => {
+    const raw = stepsInput.value.trim();
+    const newSteps = raw === "" ? null : Math.max(0, parseInt(raw, 10) || 0);
+    stepsSaveBtn.disabled = true;
+    stepsSaveBtn.textContent = "\u2026";
+    steps = newSteps;
+    await saveDay(key, { dayType, checked, steps });
+    renderPanelBody(key, dayType, checked, steps);
+  });
+  stepsInput.addEventListener("keydown", (e) => {
+    if(e.key === "Enter") stepsSaveBtn.click();
+  });
+}
+
+async function switchDayType(newType){
+  const key = dateKey(selectedDate);
+  const rec = await loadDay(key);
+  if(rec.dayType === newType) return;
+  const checked = initChecked(newType);
+  const steps = (rec.steps === undefined) ? null : rec.steps;
+  document.getElementById("btnRest").classList.toggle("active", newType === "rest");
+  document.getElementById("btnTrain").classList.toggle("active", newType === "train");
+  renderPanelBody(key, newType, checked, steps);
+  await saveDay(key, { dayType: newType, checked, steps });
+  await renderCalendar();
+}
+
+document.getElementById("btnRest").addEventListener("click", () => switchDayType("rest"));
+document.getElementById("btnTrain").addEventListener("click", () => switchDayType("train"));
+
+document.getElementById("prevMonth").addEventListener("click", async () => {
+  viewMonth--; if(viewMonth < 0){ viewMonth = 11; viewYear--; }
+  await renderCalendar();
+});
+document.getElementById("nextMonth").addEventListener("click", async () => {
+  viewMonth++; if(viewMonth > 11){ viewMonth = 0; viewYear++; }
+  await renderCalendar();
+});
+
+(async function init(){
+  await renderCalendar();
+  await renderPanel();
+})();
+</script>
+</body>
+</html>
